@@ -1,0 +1,16 @@
+*~
+*.bak
+*.pyc
+*.csv
+*.pdf
+.project
+*.sam
+*.xz
+*.aln
+.RData
+*.Rout
+logs
+*.fq
+*.vcf
+*.txt
+__pycache__
