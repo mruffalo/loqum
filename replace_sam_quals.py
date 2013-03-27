@@ -37,8 +37,7 @@ def replace_quals(sam_file, qual_file, sam_output):
                 assert read_id == sam_line.split()[0]
                 new_sam_line = replace_qual(sam_line, new_qual_str)
                 log.debug('Writing adjusted SAM line: {}'.format(new_sam_line))
-                w.write(new_sam_line)
-                w.write('\n')
+                print(new_sam_line, file=w)
 
 if __name__ == '__main__':
     p = ArgumentParser()
