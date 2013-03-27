@@ -3,7 +3,8 @@ from argparse import ArgumentParser, FileType
 from csv import DictWriter
 import logging
 from math import ceil
-from os import remove
+from os import devnull, remove
+from shutil import copyfileobj
 from subprocess import check_call
 
 from convert_sam import count_mappings, csv_fields, convert_line
@@ -13,10 +14,11 @@ logging.basicConfig(format='{asctime}|{levelname}|{message}',
     level=logging.INFO, style='{')
 info = logging.info
 
-TEMP_FILE_READ_COUNT = 50000
+TEMP_FILE_READ_COUNT = 100000
+CONCATENATE_BUFFER_SIZE = 2 ** 16
 
-LOQUM_INTERNAL_COMMAND = ('loqum-internal.R', '{command}', '{csv_input}',
-    '{model_filename}', '{csv_output')
+LOQUM_INTERNAL_COMMAND = ('./loqum-internal.R', '{command}', '{csv_input}',
+    '{model_filename}', '{csv_output}')
 
 def divide_sam_file(sam_filename, mapping_counts):
     """
@@ -73,7 +75,8 @@ def loqum_run_partial(sam_filename, model_filename, csv_filename):
         'csv_output': csv_temp_filename,
     }
     command = [piece.format(**loqum_run_data) for piece in LOQUM_INTERNAL_COMMAND]
-    check_call(command)
+    with open(devnull) as sink:
+        check_call(command, stdout=sink, stderr=sink)
     replace_quals(sam_filename, csv_temp_filename, sam_temp_filename)
     remove(sam_filename)
     remove(csv_filename)
@@ -83,19 +86,28 @@ def loqum_run_partial(sam_filename, model_filename, csv_filename):
 def loqum_run(sam_file_input, model_filename, sam_file_output):
     info('Counting mappings in {}'.format(sam_file_input))
     mapping_counts, total_count = count_mappings(sam_file_input)
-    info('Read {} distinct mappings'.format(len(mapping_counts)))
-    info('Reads with the most mappings:')
-    for item, count in mapping_counts.most_common(5):
-        info('{}: {}'.format(item, count))
-    info('Writing SAM output to {}'.format(sam_file_output))
-    #progress_output_count = 10
-    #progress_output_multiple = total_count // progress_output_count
-    for sam_filename_temp, csv_filename_temp in divide_sam_file(
-            sam_file_input, mapping_counts):
-        info('Processing {}'.format(sam_filename_temp))
-        loqum_run_partial(sam_filename_temp, model_filename,
-            csv_filename_temp)
-        break
+    info('Read {} total mappings'.format(total_count))
+    if mapping_counts:
+        info('Reads with the most mappings:')
+        for item, count in mapping_counts.most_common(5):
+            info('{}: {}'.format(item, count))
+    else:
+        info('No reads have more than one mapping')
+    progress_output_count = 20
+    progress_output_multiple = total_count // progress_output_count
+    with open(sam_file_output, 'w') as sam_w:
+        for i, (sam_filename_temp, csv_filename_temp) in enumerate(
+                divide_sam_file(sam_file_input, mapping_counts)):
+            lines_processed = i * TEMP_FILE_READ_COUNT
+            info('Processing {}'.format(sam_filename_temp))
+            temp_filename = loqum_run_partial(sam_filename_temp,
+                model_filename, csv_filename_temp)
+            with open(temp_filename) as temp_r:
+                copyfileobj(temp_r, sam_w, CONCATENATE_BUFFER_SIZE)
+            remove(temp_filename)
+            if not i % progress_output_multiple:
+                info('Approx. {}% done'.format(ceil(
+                    (lines_processed / total_count) * 100)))
 
 if __name__ == '__main__':
     p = ArgumentParser()
@@ -108,13 +120,5 @@ if __name__ == '__main__':
     args = p.parse_args()
     # We don't need the saved model file; we only care that it exists
     args.saved_model_file.close()
-    info('Counting mappings in {}'.format(args.sam_file_input))
-    mapping_counts, total_count = count_mappings(args.sam_file_input)
-    for filename in divide_sam_file('data/reads.sam', mapping_counts):
-        print(filename)
-    info('Read {} distinct mappings'.format(len(mapping_counts)))
-    info('Reads with multiple mappings:')
-    for item, count in mapping_counts.items():
-        info('{}: {}'.format(item, count))
     loqum_run(args.sam_file_input, args.saved_model_file.name,
         args.sam_file_output)
