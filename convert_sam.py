@@ -11,7 +11,8 @@ import logging
 import numpy as np
 from scipy import stats
 
-logging.basicConfig(format='%(asctime)s|%(levelname)s|%(message)s', level=logging.INFO)
+logging.basicConfig(format='{asctime}|{levelname}|{message}',
+    level=logging.INFO, style='{')
 info = logging.info
 
 cigar = re.compile(r'(\d+)([MIDS=X])')
