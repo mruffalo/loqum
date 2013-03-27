@@ -6,9 +6,14 @@ if (is.null(argv)) {
 
 source('common.R')
 
-train = function(csv.input, model.filename, csv.output) {
+predict.quals = function(csv.input, model.filename, csv.output) {
 	load(model.filename)
 	data = read.csv(csv.input)
-	preds = predict(lr, newdata=validation, type='response')
-	write.csv(preds, file='csv.output')
+	preds = data.frame(predict(lr, newdata=data, type='response'))
+	row.names(preds) = data$read_id
+	write.csv(preds, file=csv.output)
+}
+
+if (argv[1] == 'predict') {
+	predict.quals(argv[2], argv[3], argv[4])
 }

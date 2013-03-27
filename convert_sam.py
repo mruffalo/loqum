@@ -111,7 +111,8 @@ def count_mappings(sam_filename):
         # Too bad I kind of need a total mapping count also
         for i, line in enumerate(f):
             c[line.split()[0]] += 1
-    return c, i + 1
+    multiple_counts = {key: value for key, value in c.items() if value > 1}
+    return multiple_counts, i + 1
 
 # There aren't many distinct CIGAR strings in a SAM file
 @lru_cache(maxsize=50)
@@ -135,6 +136,9 @@ def convert_line(line, mapping_counts):
     position = get_read_pos(data['qname'])
     correct_aln = int(position == data['pos'])
     slope, intercept, r_value, p_value, std_err = linreg_qual(data['qual'])
+    mapping_count = 1
+    if data['qname'] in mapping_counts:
+        mapping_count = mapping_counts[data['qname']]
     return {
         'read_id': data['qname'],
         'map_qual': data['mapq'],
@@ -149,7 +153,7 @@ def convert_line(line, mapping_counts):
         'base_qual_r_value': r_value,
         'base_qual_p_value': p_value,
         'base_qual_std_err': std_err,
-        'mapping_count': mapping_counts[data['qname']],
+        'mapping_count': mapping_count,
         'correct': correct_aln,
     }
 
@@ -157,8 +161,8 @@ def convert_sam(sam_file, csv_output):
     info('Counting mappings in {}'.format(sam_file))
     mapping_counts, total_count = count_mappings(sam_file)
     info('Read {} distinct mappings'.format(len(mapping_counts)))
-    info('Reads with the most mappings:')
-    for item, count in mapping_counts.most_common(5):
+    info('Reads with multiple mappings:')
+    for item, count in mapping_counts.items():
         info('{}: {}'.format(item, count))
     info('Writing CSV output to {}'.format(csv_output))
     progress_output_count = 10
