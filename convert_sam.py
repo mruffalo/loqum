@@ -160,10 +160,8 @@ def convert_line(line, mapping_counts):
 def convert_sam(sam_file, csv_output):
     info('Counting mappings in {}'.format(sam_file))
     mapping_counts, total_count = count_mappings(sam_file)
-    info('Read {} distinct mappings'.format(len(mapping_counts)))
-    info('Reads with multiple mappings:')
-    for item, count in mapping_counts.items():
-        info('{}: {}'.format(item, count))
+    info('Read {} lines'.format(total_count))
+    info('Reads with multiple mappings: {}'.format(len(mapping_counts)))
     info('Writing CSV output to {}'.format(csv_output))
     progress_output_count = 10
     progress_output_multiple = total_count // progress_output_count
